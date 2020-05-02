@@ -2,36 +2,45 @@
 using System.Net;
 using System.IO;
 using Newtonsoft.Json;
+using System.Net.Http;
+using System.Globalization;
 
 namespace codeNationChallenge
 {
     class Program
     {
-        static void Main(string[] args)
+        static async System.Threading.Tasks.Task Main(string[] args)
         {
-            var requisicaoWeb = WebRequest.CreateHttp("https://api.codenation.dev/v1/challenge/dev-ps/generate-data?token=getToken");
-            requisicaoWeb.Method = "GET";            
-            requisicaoWeb.UserAgent = "RequisicaoWebDemo";
 
-            using (var resposta = requisicaoWeb.GetResponse())
+            var token = "?token=c91593ad6e9402f3ed01eb61096bc444f61e5ef5";
+            var url = "https://api.codenation.dev/v1/challenge/dev-ps/";
+
+
+            using var client = new HttpClient();
+            //request
+            string contentGet = await client.GetStringAsync(url + "generate-data" + token);
+            ResponseJson responseJson = JsonConvert.DeserializeObject<ResponseJson>(contentGet);
+            var jsonPost = JsonConvert.SerializeObject(responseJson);
+            if (File.Exists(@"E:\answer.json"))
             {
-                var streamDados = resposta.GetResponseStream();
-                StreamReader reader = new StreamReader(streamDados);
-                object objResponse = reader.ReadToEnd();
-                var post = JsonConvert.DeserializeObject<Post>(objResponse.ToString());
-                Console.WriteLine("número de casas:      " + post.numero_casas + "\n" +
-                                  "token:                " + post.Token + "\n" +
-                                  "cifrado:              " + post.Cifrado + "\n" +
-                                  "decifrado:            " + post.decifrado + "\n" +
-                                  "resumo criptografico: " + post.resumo_criptografico);
-                Console.WriteLine();
-                Console.ReadLine();
-                streamDados.Close();
-                resposta.Close();
+                File.Delete(@"E:\answer.json");
             }
-            Console.ReadLine();
-        }
+            File.AppendAllText(@"E:\answer.json", jsonPost);
+            Console.WriteLine(responseJson);
 
+            //post            
+            byte[] byteArray = File.ReadAllBytes(@"E:\answer.json");
+            using var contentPost = new MultipartFormDataContent("Upload----" + DateTime.Now.ToString(CultureInfo.InvariantCulture))
+                {
+                    { new StreamContent(new MemoryStream(byteArray)), "answer", "answer" }
+                };
+
+            using HttpResponseMessage message = await client.PostAsync(url + "submit-solution" + token, contentPost);
+            string input = await message.Content.ReadAsStringAsync();
+            Console.WriteLine("\n"+message);
+            Console.WriteLine("\n"+input);
+            Console.ReadLine();
+        }        
     }
 
 }
